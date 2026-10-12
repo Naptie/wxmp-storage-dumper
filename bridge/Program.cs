@@ -122,24 +122,30 @@ namespace WxmpStorageDumper
                 Console.Error.WriteLine("[extractor] failed: " + ex.Message);
                 code = 1;
             }
-            PauseIfLaunchedFromExplorer();
+            PauseIfWindowWouldClose();
             return code;
         }
 
         /// <summary>
-        /// When started via Win+R or Explorer double-click the console window
-        /// belongs to us and would close instantly — wait for a key first.
-        /// Launched from a shell (cmd/PowerShell/installer) the window stays
-        /// open anyway, so never block there.
+        /// Process hosts that keep their own console open (shell, IDE, ...).
+        /// Never block for those. Anything else — explorer/Win+R, unknown
+        /// hosts — owns a window that would vanish the moment we exit.
         /// </summary>
-        private static void PauseIfLaunchedFromExplorer()
+        private static readonly HashSet<string> _consoleHosts =
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "cmd", "powershell", "pwsh", "windowsterminal", "conhost",
+            "openconsole", "bash", "sh", "wsl", "ssh", "devenv", "code",
+            "cursor",
+        };
+
+        private static void PauseIfWindowWouldClose()
         {
             try
             {
                 if (Console.IsInputRedirected) return;
                 string parent = ParentProcessName();
-                if (!string.Equals(parent, "explorer",
-                        StringComparison.OrdinalIgnoreCase)) return;
+                if (parent.Length > 0 && _consoleHosts.Contains(parent)) return;
                 Console.WriteLine();
                 Console.WriteLine(L10n.T("Press any key to exit...",
                                          "按任意键退出..."));

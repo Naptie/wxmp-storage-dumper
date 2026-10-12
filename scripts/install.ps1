@@ -59,4 +59,25 @@ if (-not (Test-Path $exePath)) {
 }
 
 & $exePath @ExtractorArgs
-exit $LASTEXITCODE
+$code = $LASTEXITCODE
+
+# Keep the window open when this one-liner owns it (Win+R / double-click):
+# the exe's pause cannot fire here because our powershell is its parent, and
+# a parent shell would keep the console open anyway, so never block there.
+$consoleHosts = @('cmd', 'powershell', 'pwsh', 'windowsterminal', 'conhost',
+    'openconsole', 'bash', 'sh', 'wsl', 'ssh', 'devenv', 'code', 'cursor')
+try {
+    $ppid = (Get-CimInstance Win32_Process -Filter "ProcessId=$PID").ParentProcessId
+    $pname = (Get-Process -Id $ppid -ErrorAction Stop).ProcessName
+}
+catch { $pname = $null }
+if (($consoleHosts -notcontains $pname) -and -not [Console]::IsInputRedirected) {
+    Write-Host ''
+    if ((Get-Culture).TwoLetterISOLanguageName -eq 'zh') {
+        Write-Host '按回车键退出...'
+    } else {
+        Write-Host 'Press Enter to exit...'
+    }
+    [void](Read-Host)
+}
+exit $code
