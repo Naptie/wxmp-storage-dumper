@@ -1,0 +1,15 @@
+# build outputs
+bridge/bin/
+bridge/obj/
+bridge/hook-bin/
+native/wmpf-hook/*.dll
+native/wmpf-hook/*.exp
+native/wmpf-hook/*.lib
+native/wmpf-hook/*.obj
+*.user
+.vs/
+.idea/
+
+# fetched at build time
+native/third_party/
+offsets/
