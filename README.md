@@ -125,7 +125,7 @@ extraction (the hook stays loaded until WeChat restarts).
 ```bat
 :: needs VS 2022 (MSVC) + .NET SDK + network (first run)
 build-all.cmd
-:: → native\wmpf-hook\wmpf-hook-0.1.0.dll
+:: → native\wmpf-hook\wmpf-hook-<ver>.dll   (version comes from the VERSION file)
 :: → bridge\bin\Release\wxmp-storage-dumper.exe
 ```
 
