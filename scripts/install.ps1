@@ -53,7 +53,7 @@ if (-not (Test-Path $exePath)) {
 
     $curl = Join-Path $env:SystemRoot 'System32\curl.exe'
     if (Test-Path $curl) {
-        & $curl.exe -fsSL -A $ua -o $exePath $exeUrl
+        & $curl -fsSL -A $ua -o $exePath $exeUrl
         if ($LASTEXITCODE -ne 0) { throw "download failed (curl exit $LASTEXITCODE)" }
     }
     else {
