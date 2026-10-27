@@ -26,6 +26,7 @@ namespace WxmpStorageDumper
         public int? Pid;
         public bool Verbose;
         public bool SelfTest;
+        public string DetectFlue;
         public bool ShowHelp;
         public string Error;
 
@@ -75,6 +76,9 @@ namespace WxmpStorageDumper
                     case "--pid":
                         if (int.TryParse(Next(a), out var pid)) o.Pid = pid;
                         break;
+                    case "--detect-flue":
+                        o.DetectFlue = Next(a);
+                        break;
                     case "--verbose":
                         o.Verbose = true;
                         break;
@@ -120,6 +124,8 @@ namespace WxmpStorageDumper
             catch (Exception ex)
             {
                 Console.Error.WriteLine("[extractor] failed: " + ex.Message);
+                if (Environment.GetEnvironmentVariable("WMPF_DETECT_DEBUG") == "1")
+                    Console.Error.WriteLine(ex);
                 code = 1;
             }
             PauseIfWindowWouldClose();
@@ -193,6 +199,19 @@ namespace WxmpStorageDumper
             if (o.SelfTest)
                 return SelfTest() ? 0 : 1;
 
+            // Hidden diagnostic: run the offset auto-detector against a
+            // flue.dll file and print the upstream-shaped JSON. The result is
+            // also round-tripped through Offsets.Parse, so the mode proves
+            // the detection is consumable by the hook contract. No WMPF
+            // process is touched.
+            if (o.DetectFlue != null)
+            {
+                string json = Autodetect.DetectJson(o.DetectFlue);
+                Offsets.Parse(json, 0);
+                Console.WriteLine(json);
+                return 0;
+            }
+
             if (!Environment.Is64BitOperatingSystem)
             {
                 Console.Error.WriteLine(L10n.T(
@@ -214,7 +233,8 @@ namespace WxmpStorageDumper
             }
             Log($"[discover] browser pid={process.Pid} flue={process.FlueVersion}");
 
-            var offsets = Offsets.Load(process.FlueVersion, Log);
+            var offsets = Offsets.Load(process.FlueVersion, Log,
+                                       process.FlueRuntimeDir);
 
             // -- hook config + injection + WebSocket ---------------------------
             using (var server = new WsServer(o.Port, Log, o.Verbose))

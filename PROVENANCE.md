@@ -15,6 +15,13 @@ engineering from the following sources.
   `scripts/fetch-deps.ps1`, gitignored — not vendored) from WMPFDebugger's
   `frida/config/win32` offset tables. They map version-specific RVAs inside
   WeChat's WMPF runtime (`flue.dll`).
+- `bridge/Autodetect.cs` (with `bridge/PeFile.cs` and the HDE64 translation
+  in `bridge/Hde64.cs`) is a C# port of the offset auto-detector in
+  `frida/autodetect/win32.js` at upstream `main` commit `9be0b2d` (2026-10-22),
+  modern path only. Instead of scanning the live process, it analyzes the
+  on-disk `flue.dll` image; the recovery algorithm (anchor strings, LEA
+  cross-references, backward register slicing, cross-validation gates) is a
+  1:1 port and fails closed in the same places.
 - The wire protocol codec in `bridge/DebugProtocol.cs` is reimplemented from
   the message definitions used by WMPFDebugger's bundled
   `RemoteDebugCodex.js` / `WARemoteDebugProtobuf.js` / `RemoteDebugConstants.js`
@@ -29,6 +36,10 @@ engineering from the following sources.
 (BSD 2-Clause), fetched at build time by `scripts/fetch-deps.ps1` from a pinned
 commit of upstream `master` (gitignored — not vendored); see
 `native/third_party/minhook/LICENSE.txt` after fetching.
+
+`bridge/Hde64.cs` is a C# translation of Hacker Disassembler Engine 64
+(`hde64.c` / `table64.h` by Vyacheslav Patkov) as bundled inside that MinHook
+tree, used for instruction-boundary decoding by the auto-detector.
 
 ## WeChat / WMPF
 

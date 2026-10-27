@@ -19,6 +19,7 @@ namespace WxmpStorageDumper
         public int Pid;
         public string CommandLine;
         public int FlueVersion;
+        public string FlueRuntimeDir;
     }
 
     internal static class Discovery
@@ -71,15 +72,37 @@ namespace WxmpStorageDumper
                     "No WMPF browser process (WeChatAppEx.exe with --flue-runtime-dir) found.");
             }
 
+            browser.FlueRuntimeDir = ParseFlueRuntimeDir(browser.CommandLine);
             browser.FlueVersion = ParseFlueVersion(browser.CommandLine);
             return browser;
         }
 
+        // Quoted-path-safe: the runtime dir can contain spaces, so the value
+        // must be read up to the closing quote, not the next whitespace.
+        public static string ParseFlueRuntimeDir(string commandLine)
+        {
+            if (commandLine == null) return null;
+            int key = commandLine.IndexOf("--flue-runtime-dir", StringComparison.Ordinal);
+            if (key < 0) return null;
+            int p = key + "--flue-runtime-dir".Length;
+            if (p < commandLine.Length && commandLine[p] == '=') p++;
+            else while (p < commandLine.Length && (commandLine[p] == ' ' || commandLine[p] == '\t')) p++;
+            if (p >= commandLine.Length) return null;
+            if (commandLine[p] == '"')
+            {
+                int end = commandLine.IndexOf('"', p + 1);
+                if (end < 0) return null;
+                return commandLine.Substring(p + 1, end - p - 1);
+            }
+            int ws = commandLine.IndexOfAny(new[] { ' ', '\t' }, p);
+            return ws < 0 ? commandLine.Substring(p) : commandLine.Substring(p, ws - p);
+        }
+
         public static int ParseFlueVersion(string commandLine)
         {
-            var m = Regex.Match(commandLine, @"--flue-runtime-dir[=\s]+""?([^""\s]+)");
-            if (!m.Success) return 0;
-            var runs = Regex.Matches(m.Groups[1].Value, @"\d+");
+            string dir = ParseFlueRuntimeDir(commandLine);
+            if (dir == null) return 0;
+            var runs = Regex.Matches(dir, @"\d+");
             if (runs.Count == 0) return 0;
             return int.Parse(runs[runs.Count - 1].Value);
         }
@@ -106,7 +129,8 @@ namespace WxmpStorageDumper
             Timeout = TimeSpan.FromSeconds(15)
         };
 
-        public static Offsets Load(int version, Action<string> log)
+        public static Offsets Load(int version, Action<string> log,
+                                    string flueRuntimeDir = null)
         {
             string json = null;
 
@@ -124,6 +148,7 @@ namespace WxmpStorageDumper
             }
 
             // 2) upstream fetch for unknown versions
+            Exception upstreamError = null;
             if (json == null)
             {
                 string url =
@@ -136,12 +161,94 @@ namespace WxmpStorageDumper
                 }
                 catch (Exception ex)
                 {
-                    throw new InvalidOperationException(
-                        $"No offsets for WMPF {version} and upstream fetch failed: {ex.Message}");
+                    upstreamError = ex;
                 }
             }
 
+            // 3) auto-detected offsets cached by an earlier run of this tool
+            if (json == null)
+            {
+                string cached = ReadDetectedCache(version);
+                if (cached != null)
+                {
+                    log($"[offsets] addresses.{version}.json (detected cache)");
+                    json = cached;
+                }
+            }
+
+            // 4) auto-detect from the installed flue.dll image (modern builds
+            // only) and cache the result for later runs
+            string detectionError = null;
+            if (json == null && version >= 13331 &&
+                !string.IsNullOrEmpty(flueRuntimeDir))
+            {
+                string flueDll = Path.Combine(flueRuntimeDir, "flue.dll");
+                if (File.Exists(flueDll))
+                {
+                    log("[offsets] auto-detecting offsets from " + flueDll + " ...");
+                    try
+                    {
+                        json = Autodetect.DetectJson(flueDll);
+                        log("[offsets] auto-detection succeeded; caching for future runs");
+                        WriteDetectedCache(version, json);
+                    }
+                    catch (Exception ex)
+                    {
+                        detectionError = ex.Message;
+                        log("[offsets] auto-detection failed: " + detectionError);
+                    }
+                }
+            }
+
+            if (json == null)
+            {
+                string reason = upstreamError == null
+                    ? "upstream not reachable"
+                    : "upstream fetch failed: " + upstreamError.Message;
+                string detail = detectionError == null
+                    ? ""
+                    : "; auto-detection failed: " + detectionError;
+                throw new InvalidOperationException(
+                    $"No offsets for WMPF {version} ({reason}){detail}");
+            }
+
             return Parse(json, version);
+        }
+
+        private static string DetectedCachePath(int version)
+        {
+            return Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "wxmp-storage-dumper", "detected",
+                "addresses." + version + ".json");
+        }
+
+        private static string ReadDetectedCache(int version)
+        {
+            try
+            {
+                string path = DetectedCachePath(version);
+                if (!File.Exists(path)) return null;
+                return File.ReadAllText(path);
+            }
+            catch
+            {
+                return null;    // cache is best-effort
+            }
+        }
+
+        private static void WriteDetectedCache(int version, string json)
+        {
+            try
+            {
+                string path = DetectedCachePath(version);
+                Directory.CreateDirectory(Path.GetDirectoryName(path));
+                File.WriteAllText(path, json, new UTF8Encoding(false));
+            }
+            catch
+            {
+                // cache is best-effort; never fail the run over it
+            }
         }
 
         private static long[] ToLongArray(object arr)

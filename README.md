@@ -98,8 +98,9 @@ userId            : 12345
    `--flue-runtime-dir`) and parse the runtime version.
 2. **Inject** the embedded hook DLL. It installs MinHook detours on
    `AppletIndexContainer::OnLoadStart` and the CDP filter, using
-   version-specific offsets (53 known versions embedded, unknown versions
-   fetched from [WMPFDebugger](https://github.com/evi0s/WMPFDebugger)'s table).
+   version-specific offsets (known versions embedded, unknown versions fetched
+   from [WMPFDebugger](https://github.com/evi0s/WMPFDebugger)'s table, and
+   truly unknown builds auto-detected from the installed `flue.dll` itself).
 3. On the next mini-program launch the hook rewrites the launch scene to the
    debug scene (`1101`), points the debug WebSocket at
    `ws://127.0.0.1:<port>`, and sets remote-debug mode — the mini program
@@ -157,8 +158,12 @@ what `install.ps1` downloads.
 ## Limitations
 
 - Windows x64 only (the hook is an x64 MinHook port).
-- Needs a matching offset table for your WMPF version; if the table is
-  missing and upstream hasn't published one yet, the tool will say so.
+- For WMPF builds with no offset table (not embedded, not yet published
+  upstream), the tool auto-detects the offsets from the installed `flue.dll`
+  (modern layouts only) and caches the result under
+  `%LOCALAPPDATA%\wxmp-storage-dumper\detected\`. Detection fails closed: if
+  its cross-validation is not conclusive, the tool says so instead of guessing.
+  `--detect-flue <path-to-flue.dll>` runs only this detection as a diagnostic.
 - The legacy (pre-modern) hook path and the CDP-filter fallback are ported
   but only exercised on the configurations present in the offset table of
   your WeChat version — please report crashes with your WeChat version.
