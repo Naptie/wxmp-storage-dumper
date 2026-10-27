@@ -37,6 +37,8 @@ jobs:
           mkdir -p dist
           cp bridge/bin/Release/wxmp-storage-dumper.exe dist/
           cp "native/wmpf-hook/wmpf-hook-${VERSION}.dll" dist/
+          cd dist
+          sha256sum --binary * > SHA256SUMS.txt
 
       - name: Publish release
         uses: softprops/action-gh-release@v2

@@ -50,7 +50,16 @@ $exePath = Join-Path $versionDir 'wxmp-storage-dumper.exe'
 if (-not (Test-Path $exePath)) {
     New-Item -ItemType Directory -Force -Path $versionDir | Out-Null
     Write-Host "[install] downloading $tag ..."
-    Invoke-WebRequest -Uri $exeUrl -OutFile $exePath -UseBasicParsing -UserAgent $ua
+
+    $curl = Join-Path $env:SystemRoot 'System32\curl.exe'
+    if (Test-Path $curl) {
+        & $curl.exe -fsSL -A $ua -o $exePath $exeUrl
+        if ($LASTEXITCODE -ne 0) { throw "download failed (curl exit $LASTEXITCODE)" }
+    }
+    else {
+        Invoke-WebRequest -Uri $exeUrl -OutFile $exePath -UseBasicParsing -UserAgent $ua
+        Unblock-File -Path $exePath -ErrorAction SilentlyContinue
+    }
     # Keep only the two newest versioned directories.
     Get-ChildItem $installRoot -Directory |
         Sort-Object Name -Descending |

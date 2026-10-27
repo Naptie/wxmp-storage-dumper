@@ -154,6 +154,9 @@ what `install.ps1` downloads.
   versions not embedded in the binary).
 - The hook DLL stays mapped in WeChat until the app restarts. Each release
   ships under a versioned DLL name so upgrades are never silently skipped.
+- Release artifacts carry SHA-256 checksums (`SHA256SUMS.txt`); verify before
+  trusting a downloaded binary. Antivirus heuristics may flag the tool on
+  browser downloads.
 
 ## Limitations
 
